@@ -2,9 +2,6 @@
 
 一個使用 Python、Tkinter 和 Pygame 開發的桌面 Podcast 播放器。它允許使用者透過 RSS feed 訂閱、管理電台並播放單集。
 
-![App Screenshot](screenshot.png)
-*(提示: 執行程式後，擷取一張應用程式的螢幕截圖並命名為 `screenshot.png`，放在專案根目錄下，即可在此處顯示。)*
-
 ---
 
 ## 主要功能
