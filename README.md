@@ -1,6 +1,7 @@
 # Python Podcast 播放器
 
 一個使用 Python、Tkinter 和 Pygame 開發的桌面 Podcast 播放器。它允許使用者透過 RSS feed 訂閱、管理電台並播放單集。
+主要是為了沒有權限安裝軟體的環境做的。
 
 ---
 
