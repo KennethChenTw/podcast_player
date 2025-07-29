@@ -1,6 +1,6 @@
 # Python Podcast 播放器
 
-一個使用 Python、Tkinter 和 Pygame 開發的桌面 Podcast 播放器。它允許使用者透過 RSS feed 訂閱、管理電台並播放單集。
+一個使用 Python、Tkinter 和 VLC 開發的桌面 Podcast 播放器。它允許使用者透過 RSS feed 訂閱、管理電台並播放單集。
 主要是為了沒有權限安裝軟體的環境做的。
 
 ---
@@ -9,9 +9,12 @@
 
 *   **RSS 訂閱**: 從 RSS URL 讀取 Podcast 節目與單集列表。
 *   **電台管理**: 管理您的「我的電台」列表（儲存、刪除、匯入、匯出）。
-*   **播放歷史**: 維護一個可匯出/匯入的播放清單與歷史紀錄。
-*   **標準播放控制**: 完整的播放控制功能，包含播放/暫停、停止、上/下一首、音量調整及進度條拖曳。
-*   **狀態保存**: 關閉時自動儲存視窗大小、音量、上次收聽的電台與單集。
+*   **播放清單管理**: 維護一個可匯出/匯入的播放清單與歷史紀錄，支援程式啟動時自動載入上次的播放清單。
+*   **進階播放控制**: 完整的播放控制功能，包含播放/暫停、停止、上/下一首、音量調整、可拖曳進度條及變速播放。
+*   **智能播放行為**: 點擊單集時自動加入播放清單，切換電台時不清空當前播放清單。
+*   **偏好設定**: 可自訂載入單集的數量（全部或僅載入最新 N 集）。
+*   **重新整理功能**: 隨時重新載入 RSS feed 獲取最新單集。
+*   **狀態保存**: 關閉時自動儲存視窗大小、音量、播放清單及上次收聽的電台與單集。
 *   **免安裝**: 直接在 `dist` 資料夾中提供已打包的 `.exe` 執行檔，方便使用。
 
 ---
@@ -21,10 +24,10 @@
 在執行本程式前，請務必完成以下設定：
 
 1.  **作業系統**: Windows
-2.  **FFmpeg**: 本程式需要 FFmpeg 來進行音訊轉檔，這是**必要步驟**。
-    *   **下載**: 請至 [FFmpeg 官網](https://ffmpeg.org/download.html) 下載適合您作業系統的 "release" 版本。
-    *   **安裝**: 解壓縮檔案後，您必須將 `ffmpeg.exe` 所在的 `bin` 資料夾路徑**加入到您系統的環境變數 (PATH) 中**。
-    *   **驗證**: 安裝完成後，打開一個**新的**命令提示字元視窗並執行 `ffmpeg -version`。如果能成功顯示版本資訊，代表設定正確。
+2.  **VLC Media Player**: 本程式使用 VLC 作為音訊播放引擎，這是**必要步驟**。
+    *   **下載**: 請至 [VLC 官網](https://www.videolan.org/vlc/) 下載並安裝 VLC Media Player。
+    *   **安裝**: 按照安裝程式的指示安裝到預設位置。
+    *   **驗證**: 安裝完成後，確認您可以正常啟動 VLC Media Player。
 
 ---
 
@@ -36,10 +39,10 @@
 
 這是最簡單的方式，無需安裝 Python。
 
-1.  **確認系統需求**: 請確保您已完成上述的 **FFmpeg** 設定。
+1.  **確認系統需求**: 請確保您已完成上述的 **VLC Media Player** 安裝。
 2.  **下載執行檔**:
     *   點擊本儲存庫上方的 `dist/PodcastPlayer` 資料夾。
-    *   請將裡面所有裡面下載，放到同一個目錄裡。
+    *   請將裡面所有檔案下載，放到同一個目錄裡。
 3.  **執行**:
     *   下載後，直接雙擊資料夾裡的 `PodcastPlayer.exe` 即可啟動程式。
 
@@ -48,13 +51,13 @@
 如果您想查看或修改程式碼，請依照此步驟。
 
 1.  **確認系統需求**:
-    *   確保您已完成上述的 **FFmpeg** 設定。
-    *   確保您的系統已安裝 **Python 3.9** 或更高版本。
+    *   確保您已完成上述的 **VLC Media Player** 安裝。
+    *   確保您的系統已安裝 **Python 3.10** 或更高版本。
 
 2.  **Clone 儲存庫**:
     ```bash
     git clone https://github.com/KennethChenTw/podcast_player.git
-    cd podcast_player
+    cd podcast_player_v2
     ```
 
 3.  **(建議) 建立並啟用虛擬環境**:
@@ -68,10 +71,11 @@
     ```bash
     pip install -r requirements.txt
     ```
+    **注意**: 需要手動安裝 `python-vlc` 函式庫和確保 VLC Media Player 已正確安裝。
 
 5.  **執行應用程式**:
     ```bash
-    python podcast_player.py
+    python -m src.podcast_player.main
     ```
 
 ---
@@ -86,13 +90,13 @@
     ```
 
 2.  **執行打包命令**:
-    (請確保您系統的 PATH 中已經可以找到 `ffmpeg.exe`)
+    (請確保您系統已安裝 VLC Media Player)
     ```bash
     # 打包成單一資料夾模式 (啟動速度快)
-    pyinstaller --name PodcastPlayer --windowed podcast_player.py
+    pyinstaller --name PodcastPlayer --windowed src/podcast_player/main.py
 
     # 或者打包成單一檔案模式 (方便分享)
-    pyinstaller --name PodcastPlayer --onefile --windowed podcast_player.py
+    pyinstaller --name PodcastPlayer --onefile --windowed src/podcast_player/main.py
     ```
     打包後的成品會出現在 `dist` 資料夾中。
 

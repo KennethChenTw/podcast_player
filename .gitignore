@@ -9,25 +9,24 @@ venv/
 ENV/
 env/
 venv.bak/
+podcast_venv/
 
 # IDE files
 .vscode/
 .idea/
 
 # PyInstaller build files
-# dist/
+dist/
 build/
 *.spec
 
 # Temp files
 *.tmp
+*.log
 
 # OS-specific
 .DS_Store
 Thumbs.db
-
-
-# ... (您之前可能已經有的內容，如 venv/, __pycache__/ 等) ...
 
 # Editor swap files (for Vim/Neovim)
 *.swp
@@ -38,7 +37,37 @@ Thumbs.db
 backup/
 
 # Application-generated user data and settings
-my_playlist.json
-my_stations.json
-podcast_history.json
-window_settings.json
+config/my_stations.json
+config/window_settings.json
+data/current_playlist.json
+data/my_playlist.json
+data/podcast_history.json
+data/playback_positions.json
+data/*_export_*.json
+logs/
+logs/
+
+# Debug and test files
+*debug*.py
+*test*.py
+advanced_debug.py
+check_dependencies.py
+fix_dependencies.py
+direct_test.py
+final_audio_test.py
+simple_audio_*.py
+verify_fixes.py
+
+# Legacy files
+main.py
+podcast_player.py
+run.py
+run.bat
+
+# Temporary documentation
+README_EXECUTION.md
+FINAL_EXECUTION_GUIDE.md
+REFACTORING_SUMMARY.md
+RSS_DEBUG_INFO.md
+RSS_PROCESSOR_SUMMARY.md
+RUNNING_GUIDE.md
