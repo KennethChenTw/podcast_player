@@ -1,0 +1,29 @@
+{
+  "http://example.com/ep1.mp3": {
+    "episode_url": "http://example.com/ep1.mp3",
+    "episode_title": "Episode 1: Introduction",
+    "position_seconds": 450.0,
+    "duration_seconds": 1800.0,
+    "last_played": "2025-07-25T23:03:10.000402",
+    "play_count": 1,
+    "completion_percentage": 0.25
+  },
+  "http://example.com/ep2.mp3": {
+    "episode_url": "http://example.com/ep2.mp3",
+    "episode_title": "Episode 2: Getting Started",
+    "position_seconds": 1200.0,
+    "duration_seconds": 2400.0,
+    "last_played": "2025-07-25T23:03:10.006035",
+    "play_count": 1,
+    "completion_percentage": 1.0
+  },
+  "http://example.com/ep3.mp3": {
+    "episode_url": "http://example.com/ep3.mp3",
+    "episode_title": "Episode 3: Advanced Topics",
+    "position_seconds": 300.0,
+    "duration_seconds": 1500.0,
+    "last_played": "2025-07-25T23:03:10.005504",
+    "play_count": 1,
+    "completion_percentage": 0.2
+  }
+}

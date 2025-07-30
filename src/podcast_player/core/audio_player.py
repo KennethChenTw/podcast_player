@@ -12,8 +12,15 @@ import threading
 import time
 from typing import Optional, Callable, Dict, Any
 
-# Import vlc
-import vlc
+# Import vlc with fallback
+try:
+    import vlc
+    VLC_AVAILABLE = True
+except (ImportError, OSError, FileNotFoundError) as e:
+    print(f"Warning: VLC not available: {e}")
+    print("Please install VLC Media Player from https://www.videolan.org/vlc/")
+    VLC_AVAILABLE = False
+    vlc = None
 
 from .error_handler import ErrorHandler, AudioError, NetworkError, safe_execute
 from .logger import PodcastLogger, PerformanceMonitor
@@ -53,6 +60,14 @@ class AudioPlayer:
     
     def init_player(self) -> None:
         """Initialize vlc player."""
+        if not VLC_AVAILABLE:
+            error_msg = ("VLC Media Player is required but not available. "
+                        "Please install VLC from https://www.videolan.org/vlc/ "
+                        "and ensure it's in your system PATH.")
+            if self.logger:
+                self.logger.error(error_msg)
+            raise AudioError(error_msg)
+        
         if self.logger:
             self.logger.info("Initializing audio player with python-vlc")
         

@@ -11,6 +11,9 @@ urllib3>=2.2.1
 # Development and testing
 pytest>=8.3.5
 
+# Build dependencies
+pyinstaller>=5.0
+
 # Additional libraries that might be useful
 beautifulsoup4>=4.12.3
 lxml>=5.2.1

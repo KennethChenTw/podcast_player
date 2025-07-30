@@ -16,7 +16,6 @@ podcast_venv/
 .idea/
 
 # PyInstaller build files
-dist/
 build/
 *.spec
 
@@ -45,7 +44,7 @@ data/podcast_history.json
 data/playback_positions.json
 data/*_export_*.json
 logs/
-logs/
+.claude/
 
 # Debug and test files
 *debug*.py
@@ -61,7 +60,6 @@ verify_fixes.py
 # Legacy files
 main.py
 podcast_player.py
-run.py
 run.bat
 
 # Temporary documentation

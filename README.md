@@ -40,9 +40,9 @@
 這是最簡單的方式，無需安裝 Python。
 
 1.  **確認系統需求**: 請確保您已完成上述的 **VLC Media Player** 安裝。
-2.  **下載執行檔**:
+2.  **下載執行檔案**:
     *   點擊本儲存庫上方的 `dist/PodcastPlayer` 資料夾。
-    *   請將裡面所有檔案下載，放到同一個目錄裡。
+    *   請將裡面所有裡面下載，放到同一個目錄裡。
 3.  **執行**:
     *   下載後，直接雙擊資料夾裡的 `PodcastPlayer.exe` 即可啟動程式。
 
@@ -75,7 +75,7 @@
 
 5.  **執行應用程式**:
     ```bash
-    python -m src.podcast_player.main
+    python .\src\run.py
     ```
 
 ---
@@ -91,10 +91,18 @@
 
 2.  **執行打包命令**:
     (請確保您系統已安裝 VLC Media Player)
-    ```bash
+
+    ```cmd
+	# 執行建構批次檔 (推薦方式)
+    build_exe.bat
+    ```
+	
+    ```cmd
     # 打包成單一資料夾模式 (啟動速度快)
     pyinstaller --name PodcastPlayer --windowed src/podcast_player/main.py
+	```
 
+    ```cmd
     # 或者打包成單一檔案模式 (方便分享)
     pyinstaller --name PodcastPlayer --onefile --windowed src/podcast_player/main.py
     ```

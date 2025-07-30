@@ -51,17 +51,31 @@ def build_exe():
         print("PyInstaller not found. Installing...")
         run_command("pip install pyinstaller", "Installing PyInstaller")
     
-    # Build executable
-    pyinstaller_args = [
-        "pyinstaller",
-        "--onefile",
-        "--windowed",
-        "--name=PodcastPlayer",
-        "--add-data=src/podcast_player:podcast_player",
-        "main.py"
-    ]
-    
-    run_command(" ".join(pyinstaller_args), "Building executable")
+    # Check if spec file exists
+    spec_file = Path("podcast_player.spec")
+    if spec_file.exists():
+        print("Using existing spec file...")
+        run_command("pyinstaller podcast_player.spec", "Building executable with spec file")
+    else:
+        print("Creating executable with command line options...")
+        # Build executable with command line options
+        pyinstaller_args = [
+            "pyinstaller",
+            "--onefile",
+            "--windowed",
+            "--name=PodcastPlayer",
+            "--add-data=config:config",
+            "--add-data=data:data", 
+            "--hidden-import=tkinter",
+            "--hidden-import=pygame",
+            "--hidden-import=feedparser",
+            "--hidden-import=requests",
+            "--hidden-import=vlc",
+            "--paths=src",
+            "src/podcast_player/main.py"
+        ]
+        
+        run_command(" ".join(pyinstaller_args), "Building executable")
 
 
 def main():
