@@ -28,6 +28,13 @@ class ConfigManager:
         # Default settings
         self.defaults = {
             'geometry': '1000x750',
+            'window_x': None,
+            'window_y': None,
+            'window_width': 1000,
+            'window_height': 750,
+            'window_maximized': False,
+            'paned_window_positions': {},  # For PanedWindow positions
+            'column_widths': {},  # For Treeview column widths
             'volume': 0.7,
             'last_station_url': '',
             'last_playlist_index': 0,
@@ -83,9 +90,33 @@ class ConfigManager:
             bool: True if settings were saved successfully, False otherwise.
         """
         try:
+            # Get window geometry details
+            geometry = root.geometry()
+            is_maximized = root.state() == 'zoomed'
+            
+            # Parse geometry (e.g., "1000x750+100+50")
+            window_width, window_height, window_x, window_y = None, None, None, None
+            try:
+                size_part, pos_part = geometry.split('+', 1)
+                window_width, window_height = map(int, size_part.split('x'))
+                if '+' in pos_part:
+                    x_str, y_str = pos_part.split('+', 1)
+                    window_x, window_y = int(x_str), int(y_str)
+                else:
+                    window_x = int(pos_part.split('-')[0]) if '-' in pos_part else int(pos_part)
+                    window_y = int(pos_part.split('-')[1]) if '-' in pos_part else 0
+            except (ValueError, IndexError):
+                # Fallback to defaults if parsing fails
+                pass
+            
             # Update settings in memory
             self.settings.update({
-                'geometry': root.geometry(),
+                'geometry': geometry,
+                'window_width': window_width or self.defaults['window_width'],
+                'window_height': window_height or self.defaults['window_height'],
+                'window_x': window_x,
+                'window_y': window_y,
+                'window_maximized': is_maximized,
                 'volume': volume,
                 'last_station_url': rss_entry.get() if rss_entry else '',
                 'last_playlist_index': current_index if playlist else 0
@@ -210,6 +241,79 @@ class ConfigManager:
     def clear_settings(self) -> None:
         """Clear all settings from memory."""
         self.settings.clear()
+    
+    def save_paned_window_position(self, widget_name: str, position: int) -> None:
+        """
+        Save PanedWindow sash position.
+        
+        Args:
+            widget_name: Unique identifier for the paned window  
+            position: Sash position to save
+        """
+        if 'paned_window_positions' not in self.settings:
+            self.settings['paned_window_positions'] = {}
+        self.settings['paned_window_positions'][widget_name] = position
+    
+    def get_paned_window_position(self, widget_name: str, default: int = 300) -> int:
+        """
+        Get saved PanedWindow sash position.
+        
+        Args:
+            widget_name: Unique identifier for the paned window
+            default: Default position if not found
+            
+        Returns:
+            Saved position or default
+        """
+        positions = self.get_setting('paned_window_positions', {})
+        return positions.get(widget_name, default)
+    
+    def save_column_width(self, tree_name: str, column: str, width: int) -> None:
+        """
+        Save Treeview column width.
+        
+        Args:
+            tree_name: Unique identifier for the treeview
+            column: Column identifier
+            width: Width to save
+        """
+        if 'column_widths' not in self.settings:
+            self.settings['column_widths'] = {}
+        if tree_name not in self.settings['column_widths']:
+            self.settings['column_widths'][tree_name] = {}
+        self.settings['column_widths'][tree_name][column] = width
+    
+    def get_column_width(self, tree_name: str, column: str, default: int = 100) -> int:
+        """
+        Get saved Treeview column width.
+        
+        Args:
+            tree_name: Unique identifier for the treeview
+            column: Column identifier
+            default: Default width if not found
+            
+        Returns:
+            Saved width or default
+        """
+        widths = self.get_setting('column_widths', {})
+        tree_widths = widths.get(tree_name, {})
+        return tree_widths.get(column, default)
+    
+    def get_window_state(self) -> Dict[str, Any]:
+        """
+        Get detailed window state information.
+        
+        Returns:
+            Dictionary containing window state details
+        """
+        return {
+            'width': self.get_setting('window_width', self.defaults['window_width']),
+            'height': self.get_setting('window_height', self.defaults['window_height']),
+            'x': self.get_setting('window_x', self.defaults['window_x']),
+            'y': self.get_setting('window_y', self.defaults['window_y']),
+            'maximized': self.get_setting('window_maximized', self.defaults['window_maximized']),
+            'geometry': self.get_setting('geometry', self.defaults['geometry'])
+        }
     
     def delete_settings_file(self) -> bool:
         """

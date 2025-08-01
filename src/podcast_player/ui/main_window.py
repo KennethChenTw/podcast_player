@@ -73,6 +73,36 @@ class MainWindow:
         self.root.title("Podcast 播放器")
         self.root.minsize(800, 600)
         
+        # Load and apply saved window state
+        config_manager = self.app_components.get('config_manager')
+        if config_manager:
+            window_state = config_manager.get_window_state()
+            
+            # Apply window size and position
+            if window_state['maximized']:
+                self.root.state('zoomed')
+            else:
+                # Set size
+                width = window_state['width']
+                height = window_state['height']
+                
+                # Set position if available
+                if window_state['x'] is not None and window_state['y'] is not None:
+                    geometry = f"{width}x{height}+{window_state['x']}+{window_state['y']}"
+                else:
+                    # Center on screen if no position saved
+                    screen_width = self.root.winfo_screenwidth()
+                    screen_height = self.root.winfo_screenheight()
+                    x = (screen_width - width) // 2
+                    y = (screen_height - height) // 2
+                    geometry = f"{width}x{height}+{x}+{y}"
+                
+                self.root.geometry(geometry)
+        
+        # Bind window state change events
+        self.root.bind('<Configure>', self.on_window_configure)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
         # Set window icon if available
         try:
             # self.root.iconbitmap("icon.ico")  # Uncomment when icon is available
@@ -171,28 +201,24 @@ class MainWindow:
         # Focus on the root window to capture all key events
         self.root.focus_set()
         
-        # Bind keyboard shortcuts
-        self.root.bind('<Key>', self.handle_key_press)
-        self.root.bind('<KeyPress>', self.handle_key_press)
-        
-        # Specific key bindings
-        self.root.bind('<space>', lambda e: self.toggle_play())
-        self.root.bind('<Return>', lambda e: self.toggle_play())
-        self.root.bind('<Escape>', lambda e: self.stop_playback())
+        # Specific key bindings (with focus check)
+        self.root.bind('<space>', lambda e: self.handle_shortcut(e, self.toggle_play))
+        self.root.bind('<Return>', lambda e: self.handle_shortcut(e, self.toggle_play))
+        self.root.bind('<Escape>', lambda e: self.handle_shortcut(e, self.stop_playback))
         
         # Volume control
-        self.root.bind('<Up>', lambda e: self.adjust_volume(0.1))
-        self.root.bind('<Down>', lambda e: self.adjust_volume(-0.1))
+        self.root.bind('<Up>', lambda e: self.handle_shortcut(e, lambda: self.adjust_volume(0.1)))
+        self.root.bind('<Down>', lambda e: self.handle_shortcut(e, lambda: self.adjust_volume(-0.1)))
         
         # Track navigation
-        self.root.bind('<Left>', lambda e: self.previous_track())
-        self.root.bind('<Right>', lambda e: self.next_track())
+        self.root.bind('<Left>', lambda e: self.handle_shortcut(e, self.previous_track))
+        self.root.bind('<Right>', lambda e: self.handle_shortcut(e, self.next_track))
         
         # Speed control
-        self.root.bind('<plus>', lambda e: self.cycle_speed())
-        self.root.bind('<minus>', lambda e: self.cycle_speed())
+        self.root.bind('<plus>', lambda e: self.handle_shortcut(e, self.cycle_speed))
+        self.root.bind('<minus>', lambda e: self.handle_shortcut(e, self.cycle_speed))
         
-        # Search focus
+        # Search focus (always work)
         self.root.bind('<Control-f>', lambda e: self.focus_search())
         
         # Refresh
@@ -203,9 +229,6 @@ class MainWindow:
         
         # Theme toggle
         self.root.bind('<Control-t>', lambda e: self.toggle_theme())
-        
-        # Make window focusable
-        self.root.bind('<Button-1>', lambda e: self.root.focus_set())
     
     def update_status(self, message: str, show_progress: bool = False) -> None:
         """
@@ -373,6 +396,27 @@ class MainWindow:
             print(f"Error changing theme: {e}")
             self.update_status("主題切換時發生錯誤")
     
+    def handle_shortcut(self, event, callback) -> None:
+        """
+        Handle keyboard shortcuts with focus checking.
+        
+        Args:
+            event: Key press event
+            callback: Function to call if shortcut should be executed
+        """
+        # Check if focus is on a text input widget
+        focused_widget = self.root.focus_get()
+        
+        # Skip shortcut if typing in Entry, Text, or Combobox
+        if focused_widget and isinstance(focused_widget, (tk.Entry, tk.Text, ttk.Combobox)):
+            return
+        
+        # Execute the callback
+        try:
+            callback()
+        except Exception as e:
+            print(f"Error executing shortcut: {e}")
+    
     def handle_key_press(self, event) -> None:
         """
         Handle general key press events.
@@ -382,7 +426,7 @@ class MainWindow:
         """
         # Only handle if focus is on the main window, not on text inputs
         focused_widget = self.root.focus_get()
-        if isinstance(focused_widget, (tk.Entry, tk.Text)):
+        if focused_widget and isinstance(focused_widget, (tk.Entry, tk.Text, ttk.Combobox)):
             return
         
         # Log key press for debugging
@@ -521,13 +565,122 @@ class MainWindow:
             "© 2024 Podcast Player Team"
         )
     
+    def on_window_configure(self, event) -> None:
+        """
+        Handle window configuration changes (resize, move).
+        
+        Args:
+            event: Configure event
+        """
+        # Only handle main window events, not child widgets
+        if event.widget != self.root:
+            return
+        
+        # Save window state periodically (throttle to avoid excessive saving)
+        if not hasattr(self, '_last_save_time'):
+            self._last_save_time = 0
+        
+        import time
+        current_time = time.time()
+        if current_time - self._last_save_time > 2.0:  # Save at most every 2 seconds
+            self.save_window_state()
+            self._last_save_time = current_time
+    
+    def save_window_state(self) -> None:
+        """Save current window state to configuration."""
+        config_manager = self.app_components.get('config_manager')
+        if not config_manager:
+            return
+        
+        try:
+            # Get current geometry
+            geometry = self.root.geometry()
+            is_maximized = self.root.state() == 'zoomed'
+            
+            # Parse geometry
+            window_width, window_height, window_x, window_y = None, None, None, None
+            try:
+                if '+' in geometry:
+                    size_part, pos_part = geometry.split('+', 1)
+                    window_width, window_height = map(int, size_part.split('x'))
+                    
+                    # Handle negative positions
+                    pos_parts = pos_part.replace('-', '+-').split('+')
+                    pos_parts = [p for p in pos_parts if p]  # Remove empty strings
+                    
+                    if len(pos_parts) >= 2:
+                        window_x = int(pos_parts[0])
+                        window_y = int(pos_parts[1])
+                    elif len(pos_parts) == 1:
+                        window_x = int(pos_parts[0])
+                        window_y = 0
+                else:
+                    window_width, window_height = map(int, geometry.split('x'))
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing geometry '{geometry}': {e}")
+            
+            # Update settings
+            if window_width and window_height:
+                config_manager.update_setting('window_width', window_width)
+                config_manager.update_setting('window_height', window_height)
+            if window_x is not None:
+                config_manager.update_setting('window_x', window_x)
+            if window_y is not None:
+                config_manager.update_setting('window_y', window_y)
+            config_manager.update_setting('window_maximized', is_maximized)
+            config_manager.update_setting('geometry', geometry)
+            
+        except Exception as e:
+            print(f"Error saving window state: {e}")
+    
     def on_closing(self) -> None:
         """Handle window closing."""
+        # Save final window state
+        self.save_window_state()
+        
+        # Save any PanedWindow positions
+        self.save_ui_layout_state()
+        
         # Delegate to main application
         if 'on_closing' in self.app_components:
             self.app_components['on_closing']()
         else:
             self.root.destroy()
+    
+    def save_ui_layout_state(self) -> None:
+        """Save UI layout state like PanedWindow positions and column widths."""
+        config_manager = self.app_components.get('config_manager')
+        if not config_manager:
+            return
+        
+        try:
+            # Save PanedWindow positions (if any exist in the UI)
+            # This would need to be implemented based on actual UI components
+            ui_widgets = self.ui.get_all_widgets() if hasattr(self.ui, 'get_all_widgets') else {}
+            
+            for widget_name, widget in ui_widgets.items():
+                if isinstance(widget, tk.PanedWindow):
+                    # Save sash positions
+                    for i in range(widget.panes().__len__() - 1):
+                        try:
+                            position = widget.sash_coord(i)[0]  # Get x coordinate
+                            config_manager.save_paned_window_position(f"{widget_name}_sash_{i}", position)
+                        except tk.TclError:
+                            pass  # Sash might not exist yet
+                
+                elif hasattr(widget, 'heading'):  # Treeview-like widget
+                    try:
+                        # Save column widths
+                        columns = widget['columns'] if widget['columns'] else ['#0']
+                        for col in columns:
+                            width = widget.column(col, 'width')
+                            if width:
+                                config_manager.save_column_width(widget_name, col, width)
+                    except (tk.TclError, KeyError):
+                        pass
+        
+        except Exception as e:
+            print(f"Error saving UI layout state: {e}")
     
     def get_ui_component(self) -> PodcastPlayerUI:
         """

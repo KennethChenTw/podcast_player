@@ -380,7 +380,11 @@ class EventHandlers:
     def handle_progress_update(self, current_pos: int, duration: int) -> None:
         """Handle progress update from audio player."""
         try:
-            self.ui.update_progress(current_pos, duration)
+            # Get current playback rate from audio player
+            playback_rate = getattr(self.audio_player, 'playback_speed', 1.0)
+            
+            # Update UI with enhanced progress information
+            self.ui.update_progress(current_pos, duration, playback_rate)
             
         except Exception as e:
             print(f"Error updating progress: {e}")
@@ -504,39 +508,180 @@ class EventHandlers:
             messagebox.showerror("錯誤", f"清除電台時發生錯誤: {str(e)}")
     
     def handle_search_episodes(self, *args) -> None:
-        """Handle episode search."""
+        """Handle episode search with enhanced fuzzy matching."""
         try:
             if not self.current_podcast_data:
                 return
             
-            search_term = self.ui.get_widget('search_var').get().lower().strip()
+            search_term = self.ui.get_widget('search_var').get().strip()
             
             if not search_term:
                 # Show all episodes if search is empty
                 self.ui.populate_episode_tree(self.current_podcast_data.episodes)
                 return
             
-            # Filter episodes based on search term
-            filtered_episodes = []
-            for episode in self.current_podcast_data.episodes:
-                title_match = search_term in episode.title.lower()
-                description_match = search_term in episode.description.lower()
-                
-                if title_match or description_match:
-                    filtered_episodes.append(episode)
+            # Add to search history
+            self._add_to_search_history(search_term)
+            
+            # Update search history UI
+            self.ui.update_search_history(self.get_search_history())
+            
+            # Check search mode and filter accordingly
+            search_mode = self.ui.get_search_mode()
+            if search_mode == "模糊":
+                filtered_episodes = self._filter_episodes_fuzzy(self.current_podcast_data.episodes, search_term)
+            else:
+                filtered_episodes = self._filter_episodes_exact(self.current_podcast_data.episodes, search_term)
             
             # Update UI with filtered results
             self.ui.populate_episode_tree(filtered_episodes)
             
-            # Update status
+            # Update status with more detailed info
             if filtered_episodes:
-                self.ui.update_status(f"找到 {len(filtered_episodes)} 個相符的集數")
+                total_episodes = len(self.current_podcast_data.episodes)
+                self.ui.update_status(f"搜尋 '{search_term}': 找到 {len(filtered_episodes)}/{total_episodes} 個相符的集數")
             else:
-                self.ui.update_status("沒有找到相符的集數")
+                self.ui.update_status(f"搜尋 '{search_term}': 沒有找到相符的集數")
                 
         except Exception as e:
             print(f"Search error: {e}")
             self.ui.update_status("搜尋時發生錯誤")
+    
+    def _filter_episodes_fuzzy(self, episodes, search_term):
+        """
+        Filter episodes using fuzzy matching algorithm.
+        
+        Args:
+            episodes: List of episodes to filter
+            search_term: Search term to match against
+            
+        Returns:
+            List of matched episodes, sorted by relevance
+        """
+        search_lower = search_term.lower()
+        search_words = search_lower.split()
+        
+        matches = []
+        
+        for episode in episodes:
+            title_lower = episode.title.lower()
+            description_lower = episode.description.lower()
+            
+            # Scoring system for relevance
+            score = 0
+            
+            # Exact phrase match (highest priority)
+            if search_lower in title_lower:
+                score += 100
+            elif search_lower in description_lower:
+                score += 50
+            
+            # Individual word matches
+            for word in search_words:
+                if word in title_lower:
+                    score += 20
+                elif word in description_lower:
+                    score += 10
+                
+                # Fuzzy matching for similar words
+                title_words = title_lower.split()
+                desc_words = description_lower.split()
+                
+                for title_word in title_words:
+                    if self._fuzzy_match(word, title_word):
+                        score += 15
+                        
+                for desc_word in desc_words:
+                    if self._fuzzy_match(word, desc_word):
+                        score += 8
+            
+            # Include episode if it has any relevance
+            if score > 0:
+                matches.append((episode, score))
+        
+        # Sort by score (descending) and return episodes
+        matches.sort(key=lambda x: x[1], reverse=True)
+        return [match[0] for match in matches]
+    
+    def _fuzzy_match(self, word1, word2, threshold=0.7):
+        """
+        Simple fuzzy string matching using Levenshtein-like algorithm.
+        
+        Args:
+            word1: First word to compare
+            word2: Second word to compare
+            threshold: Similarity threshold (0.0 to 1.0)
+            
+        Returns:
+            True if words are similar enough, False otherwise
+        """
+        if len(word1) < 3 or len(word2) < 3:
+            return word1 == word2
+        
+        # Simple similarity calculation
+        shorter = min(len(word1), len(word2))
+        longer = max(len(word1), len(word2))
+        
+        if longer == 0:
+            return True
+        
+        # Count matching characters in order
+        matches = 0
+        i = j = 0
+        while i < len(word1) and j < len(word2):
+            if word1[i] == word2[j]:
+                matches += 1
+                i += 1
+                j += 1
+            else:
+                i += 1 if len(word1) > len(word2) else j + 1
+                j += 1 if len(word2) > len(word1) else i + 1
+        
+        similarity = matches / longer
+        return similarity >= threshold
+    
+    def _add_to_search_history(self, search_term):
+        """Add search term to history."""
+        if not hasattr(self, 'search_history'):
+            self.search_history = []
+        
+        # Remove if already exists (move to front)
+        if search_term in self.search_history:
+            self.search_history.remove(search_term)
+        
+        # Add to front
+        self.search_history.insert(0, search_term)
+        
+        # Limit history size
+        if len(self.search_history) > 20:
+            self.search_history = self.search_history[:20]
+    
+    def _filter_episodes_exact(self, episodes, search_term):
+        """
+        Filter episodes using exact matching.
+        
+        Args:
+            episodes: List of episodes to filter
+            search_term: Search term to match against
+            
+        Returns:
+            List of matched episodes
+        """
+        search_lower = search_term.lower()
+        matches = []
+        
+        for episode in episodes:
+            title_lower = episode.title.lower()
+            description_lower = episode.description.lower()
+            
+            if search_lower in title_lower or search_lower in description_lower:
+                matches.append(episode)
+        
+        return matches
+    
+    def get_search_history(self):
+        """Get search history for UI components."""
+        return getattr(self, 'search_history', [])
     
     def handle_clear_search(self) -> None:
         """Handle clear search."""

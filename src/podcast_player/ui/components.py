@@ -189,17 +189,48 @@ class PodcastPlayerUI:
         self.widgets['progress_scale'].pack(fill=tk.X, padx=5)
         self.widgets['progress_bar'] = self.widgets['progress_scale'] # Keep alias for compatibility
         
-        # Time labels
+        # Enhanced time display
         time_frame = tk.Frame(self.widgets['top_frame'], bg='#f0f0f0')
-        time_frame.pack(side=tk.TOP, fill=tk.X)
+        time_frame.pack(side=tk.TOP, fill=tk.X, pady=2)
         
+        # Current/Total time
         self.widgets['time_label'] = tk.Label(
             time_frame, 
             text="00:00 / 00:00", 
             bg='#f0f0f0',
-            font=("Arial", 9)
+            font=("Arial", 9, "bold")
         )
-        self.widgets['time_label'].pack()
+        self.widgets['time_label'].pack(side=tk.LEFT)
+        
+        # Remaining time
+        self.widgets['remaining_time_label'] = tk.Label(
+            time_frame, 
+            text="", 
+            bg='#f0f0f0',
+            font=("Arial", 8),
+            fg='#666666'
+        )
+        self.widgets['remaining_time_label'].pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Progress percentage
+        self.widgets['progress_percent_label'] = tk.Label(
+            time_frame, 
+            text="0%", 
+            bg='#f0f0f0',
+            font=("Arial", 8),
+            fg='#666666'
+        )
+        self.widgets['progress_percent_label'].pack(side=tk.RIGHT)
+        
+        # Playback rate indicator
+        self.widgets['rate_indicator_label'] = tk.Label(
+            time_frame, 
+            text="1.0x", 
+            bg='#f0f0f0',
+            font=("Arial", 8),
+            fg='#333333'
+        )
+        self.widgets['rate_indicator_label'].pack(side=tk.RIGHT, padx=(0, 10))
     
     def create_rss_section(self) -> None:
         """Create RSS input and station management section."""
@@ -261,28 +292,65 @@ class PodcastPlayerUI:
         
         tk.Label(header_frame, text="節目列表", font=("Arial", 12, "bold")).pack(side=tk.LEFT)
         
-        # Search functionality
+        # Enhanced search functionality
         search_frame = tk.Frame(header_frame)
         search_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(10, 0))
         
         tk.Label(search_frame, text="搜尋:", font=("Arial", 9)).pack(side=tk.LEFT)
         
+        # Search input with history
+        search_input_frame = tk.Frame(search_frame)
+        search_input_frame.pack(side=tk.LEFT, padx=(5, 2))
+        
         self.widgets['search_var'] = tk.StringVar()
         self.widgets['search_entry'] = tk.Entry(
-            search_frame, 
+            search_input_frame, 
             textvariable=self.widgets['search_var'],
             width=20,
             font=("Arial", 9)
         )
-        self.widgets['search_entry'].pack(side=tk.LEFT, padx=(5, 2))
+        self.widgets['search_entry'].pack(side=tk.TOP)
+        
+        # Search history dropdown (initially hidden)
+        self.widgets['search_history_var'] = tk.StringVar()
+        self.widgets['search_history_combo'] = ttk.Combobox(
+            search_input_frame,
+            textvariable=self.widgets['search_history_var'],
+            font=("Arial", 8),
+            height=5,
+            width=18,
+            state='readonly'
+        )
+        
+        # Search options
+        search_options_frame = tk.Frame(search_frame)
+        search_options_frame.pack(side=tk.LEFT, padx=2)
         
         # Clear search button
         self.widgets['clear_search_button'] = ttk.Button(
-            search_frame,
+            search_options_frame,
             text="清除",
-            width=6
+            width=5
         )
-        self.widgets['clear_search_button'].pack(side=tk.LEFT, padx=2)
+        self.widgets['clear_search_button'].pack(side=tk.TOP)
+        
+        # Search mode toggle
+        self.widgets['search_mode_var'] = tk.StringVar(value="模糊")
+        self.widgets['search_mode_button'] = ttk.Button(
+            search_options_frame,
+            textvariable=self.widgets['search_mode_var'],
+            width=5
+        )
+        self.widgets['search_mode_button'].pack(side=tk.TOP, pady=(2, 0))
+        
+        # Search status
+        self.widgets['search_status_label'] = tk.Label(
+            search_frame,
+            text="",
+            font=("Arial", 8),
+            fg="gray"
+        )
+        self.widgets['search_status_label'].pack(side=tk.RIGHT, padx=(5, 0))
         
         # Episode tree view
         tree_frame = tk.Frame(left_panel)
@@ -421,16 +489,21 @@ class PodcastPlayerUI:
         self.widgets['save_station_button'].config(command=self._get_callback('save_station'))
         self.widgets['delete_station_button'].config(command=self._get_callback('delete_station'))
 
-        # Episode List
+        # Episode List and Enhanced Search
         self.widgets['search_var'].trace('w', self._get_callback('search_episodes'))
         self.widgets['clear_search_button'].config(command=self._get_callback('clear_search'))
+        self.widgets['search_mode_button'].config(command=self._toggle_search_mode)
+        self.widgets['search_history_combo'].bind('<<ComboboxSelected>>', self._on_history_selected)
+        self.widgets['search_entry'].bind('<Return>', lambda e: self._handle_search_enter(e))
+        self.widgets['search_entry'].bind('<Escape>', lambda e: self._handle_search_escape(e))
+        self.widgets['search_entry'].bind('<Control-a>', lambda e: self._handle_search_select_all(e))
         self.widgets['episode_tree'].bind('<Double-1>', self._get_callback('episode_double_click'))
         self.widgets['episode_tree'].bind('<<TreeviewSelect>>', self._get_callback('episode_select'))
 
         # Playlist
         self.widgets['playlist_listbox'].bind('<Double-1>', self._get_callback('playlist_double_click'))
         
-        print(f"✅ UI callbacks set up and bound: {len(callback_mapping)} events mapped")
+        print(f"UI callbacks set up and bound: {len(callback_mapping)} events mapped")
     
     def _show_about(self) -> None:
         """Show about dialog."""
@@ -463,21 +536,39 @@ class PodcastPlayerUI:
         else:
             self.widgets['play_button'].config(text="播放")
     
-    def update_progress(self, current: int, duration: int) -> None:
-        """Update progress scale and time display."""
+    def update_progress(self, current: int, duration: int, playback_rate: float = 1.0) -> None:
+        """Update progress scale and enhanced time display."""
         if 'progress_var' in self.widgets and 'time_label' in self.widgets and 'progress_scale' in self.widgets:
             # Update progress scale range and value
             if duration > 0:
-                self.widgets['progress_scale'].config(to=duration) # Set max value of scale to duration
+                self.widgets['progress_scale'].config(to=duration)
                 self.widgets['progress_var'].set(current)
+                progress_percent = (current / duration) * 100
             else:
                 self.widgets['progress_scale'].config(to=0)
                 self.widgets['progress_var'].set(0)
+                progress_percent = 0
             
-            # Update time label
-            current_time = self._format_time(current)
-            total_time = self._format_time(duration)
+            # Update main time display
+            current_time = self._format_time_enhanced(current)
+            total_time = self._format_time_enhanced(duration)
             self.widgets['time_label'].config(text=f"{current_time} / {total_time}")
+            
+            # Update remaining time
+            if duration > 0 and 'remaining_time_label' in self.widgets:
+                remaining_seconds = duration - current
+                remaining_time = self._format_time_enhanced(remaining_seconds)
+                self.widgets['remaining_time_label'].config(text=f"剩餘 {remaining_time}")
+            elif 'remaining_time_label' in self.widgets:
+                self.widgets['remaining_time_label'].config(text="")
+            
+            # Update progress percentage
+            if 'progress_percent_label' in self.widgets:
+                self.widgets['progress_percent_label'].config(text=f"{progress_percent:.1f}%")
+            
+            # Update playback rate indicator
+            if 'rate_indicator_label' in self.widgets:
+                self.widgets['rate_indicator_label'].config(text=f"{playback_rate:.1f}x")
     
     def update_station_combobox(self, stations: list) -> None:
         """Update station combobox with station list."""
@@ -531,3 +622,102 @@ class PodcastPlayerUI:
         minutes = seconds // 60
         seconds = seconds % 60
         return f"{minutes:02d}:{seconds:02d}"
+    
+    def _format_time_enhanced(self, seconds: int) -> str:
+        """Format time with hours if needed (HH:MM:SS or MM:SS)."""
+        if seconds < 0:
+            return "00:00"
+        
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        seconds = seconds % 60
+        
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        else:
+            return f"{minutes:02d}:{seconds:02d}"
+    
+    def _toggle_search_mode(self) -> None:
+        """Toggle between fuzzy and exact search modes."""
+        current_mode = self.widgets['search_mode_var'].get()
+        new_mode = "精確" if current_mode == "模糊" else "模糊"
+        self.widgets['search_mode_var'].set(new_mode)
+        
+        # Trigger search refresh if there's a current search
+        search_term = self.widgets['search_var'].get().strip()
+        if search_term:
+            # Re-trigger search with new mode
+            if 'search_episodes' in self.callbacks:
+                self.callbacks['search_episodes']()
+    
+    def update_search_history(self, history_list) -> None:
+        """
+        Update search history dropdown.
+        
+        Args:
+            history_list: List of search history items
+        """
+        combo = self.widgets['search_history_combo']
+        combo['values'] = history_list
+        
+        # Show/hide history dropdown based on availability
+        if history_list:
+            combo.pack(side=tk.TOP, pady=(2, 0))
+        else:
+            combo.pack_forget()
+    
+    def get_search_mode(self) -> str:
+        """Get current search mode."""
+        return self.widgets['search_mode_var'].get()
+    
+    def update_search_status(self, status: str) -> None:
+        """
+        Update search status label.
+        
+        Args:
+            status: Status message to display
+        """
+        self.widgets['search_status_label'].config(text=status)
+    
+    def _on_history_selected(self, event) -> None:
+        """Handle search history selection."""
+        selected_term = self.widgets['search_history_var'].get()
+        if selected_term:
+            self.widgets['search_var'].set(selected_term)
+            # Hide history dropdown after selection
+            self.widgets['search_history_combo'].pack_forget()
+    
+    def _handle_search_enter(self, event) -> None:
+        """Handle Enter key in search entry."""
+        try:
+            if 'search_episodes' in self.callbacks:
+                self.callbacks['search_episodes']()
+            return 'break'  # Prevent further event propagation
+        except Exception as e:
+            print(f"Error handling search enter: {e}")
+    
+    def _handle_search_escape(self, event) -> None:
+        """Handle Escape key in search entry."""
+        try:
+            if 'clear_search' in self.callbacks:
+                self.callbacks['clear_search']()
+            return 'break'  # Prevent further event propagation
+        except Exception as e:
+            print(f"Error handling search escape: {e}")
+    
+    def _handle_search_select_all(self, event) -> None:
+        """Handle Ctrl+A in search entry."""
+        try:
+            self.widgets['search_entry'].select_range(0, tk.END)
+            return 'break'  # Prevent further event propagation
+        except Exception as e:
+            print(f"Error selecting all in search: {e}")
+    
+    def _show_about(self) -> None:
+        """Show about dialog."""
+        from tkinter import messagebox
+        messagebox.showinfo(
+            "關於 Podcast 播放器", 
+            "Podcast 播放器 v1.0\\n\\n"
+            "一個使用 Python 開發的播客播放器，支援 RSS 訂閱和播放清單管理。"
+        )
