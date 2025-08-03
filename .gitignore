@@ -45,6 +45,7 @@ data/playback_positions.json
 data/*_export_*.json
 logs/
 .claude/
+CLAUDE.md
 
 # Debug and test files
 *debug*.py
@@ -56,6 +57,8 @@ direct_test.py
 final_audio_test.py
 simple_audio_*.py
 verify_fixes.py
+fix_log*.md
+coversation*.txt
 
 # Legacy files
 main.py

@@ -372,7 +372,27 @@ class EventHandlers:
                         self.playlist_manager.current_index
                     )
                     
-                    self.handle_toggle_play()
+                    # 停止當前播放（如果有的話）然後開始播放選中的軌道
+                    if self.audio_player.is_playing:
+                        self.audio_player.stop()
+                    
+                    # 直接開始播放選中的軌道
+                    current_track = self.playlist_manager.get_current_track()
+                    if current_track:
+                        self.ui.update_status("正在載入...")
+                        self.ui.set_controls_state(False)
+                        
+                        self.audio_player.play_track(
+                            url=current_track.url,
+                            title=current_track.title,
+                            progress_callback=self.handle_progress_update,
+                            completion_callback=self.handle_track_completion,
+                            error_callback=self.handle_playback_error
+                        )
+                        
+                        self.ui.update_play_button(True, False)
+                        self.ui.set_controls_state(True)
+                        self.ui.update_status(f"播放: {current_track.title}")
                     
         except Exception as e:
             messagebox.showerror("錯誤", f"播放曲目時發生錯誤: {str(e)}")
