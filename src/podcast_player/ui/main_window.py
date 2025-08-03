@@ -12,6 +12,8 @@ from typing import Optional, Dict, Any
 from .components import PodcastPlayerUI
 from .event_handlers import EventHandlers
 from .theme_manager import ThemeManager
+from .preferences_dialog import PreferencesDialog
+from ..managers.font_manager import FontManager
 
 
 class MainWindow:
@@ -36,11 +38,16 @@ class MainWindow:
         # Set up window properties
         self.setup_window()
         
-        # Initialize theme manager
+        # Initialize managers
         self.theme_manager = ThemeManager(app_components.get('config_manager'))
         
-        # Create UI components first
-        self.ui = PodcastPlayerUI(self.root)
+        # Initialize font manager with current scale from config
+        config_manager = app_components.get('config_manager')
+        current_font_scale = config_manager.get_font_scale() if config_manager else 1.0
+        self.font_manager = FontManager(current_font_scale)
+        
+        # Create UI components with font manager
+        self.ui = PodcastPlayerUI(self.root, self.font_manager)
         
         # Set up event handlers and pass them to UI
         self.event_handlers = EventHandlers(
@@ -283,72 +290,33 @@ class MainWindow:
     
     def show_preferences(self) -> None:
         """Show preferences dialog."""
-        pref_window = tk.Toplevel(self.root)
-        pref_window.title("偏好設定")
-        pref_window.transient(self.root)
-        pref_window.grab_set()
-        
         config_manager = self.app_components.get('config_manager')
         
-        main_frame = ttk.Frame(pref_window, padding="10")
-        main_frame.pack(expand=True, fill="both")
-
-        # --- Episode Loading Settings ---
-        load_frame = ttk.LabelFrame(main_frame, text="單集載入設定", padding="10")
-        load_frame.pack(fill="x", expand=True, pady=5)
-
-        # Ensure config_manager is not None before calling its methods
-        load_mode_val = config_manager.get_setting('episode_load_mode', 'all') if config_manager else 'all'
-        latest_count_val = str(config_manager.get_setting('latest_episode_count', 10)) if config_manager else '10'
-
-        load_mode = tk.StringVar(value=load_mode_val)
-        latest_count = tk.StringVar(value=latest_count_val)
-
-        def update_entry_state():
-            # Ensure count_entry is a valid Entry widget
-            if isinstance(count_entry, tk.Entry):
-                if load_mode.get() == 'latest':
-                    count_entry.config(state='normal')
-                else:
-                    count_entry.config(state='disabled')
-
-        ttk.Radiobutton(load_frame, text="載入所有單集", variable=load_mode, value='all', command=update_entry_state).pack(anchor='w')
+        # Create preferences dialog with font scaling support
+        preferences_dialog = PreferencesDialog(
+            parent=self.root,
+            config_manager=config_manager,
+            font_manager=self.font_manager,
+            apply_callback=self._on_font_scale_changed
+        )
         
-        latest_frame = ttk.Frame(load_frame)
-        latest_frame.pack(fill='x', expand=True)
+        preferences_dialog.show()
         
-        ttk.Radiobutton(latest_frame, text="只載入最新的", variable=load_mode, value='latest', command=update_entry_state).pack(side='left')
+    def _on_font_scale_changed(self, new_scale: float) -> None:
+        """
+        Handle font scale changes from preferences dialog.
         
-        count_entry = ttk.Entry(latest_frame, textvariable=latest_count, width=5)
-        count_entry.pack(side='left', padx=5)
-        
-        ttk.Label(latest_frame, text="集").pack(side='left')
-
-        update_entry_state()
-
-        # --- Buttons ---
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill="x", pady=10, side="bottom")
-
-        def save_settings():
-            try:
-                count = int(latest_count.get())
-                if count <= 0:
-                    raise ValueError("數量必須是正整數")
-                
-                # Ensure config_manager is not None before calling its methods
-                if config_manager:
-                    config_manager.set_setting('episode_load_mode', load_mode.get())
-                    config_manager.set_setting('latest_episode_count', count)
-                
-                self.update_status("偏好設定已儲存")
-                pref_window.destroy()
-            except ValueError as e:
-                from tkinter import messagebox
-                messagebox.showerror("輸入錯誤", str(e), parent=pref_window)
-
-        ttk.Button(button_frame, text="儲存", command=save_settings).pack(side="right", padx=5)
-        ttk.Button(button_frame, text="取消", command=pref_window.destroy).pack(side="right")
+        Args:
+            new_scale: New font scale value
+        """
+        try:
+            # Update UI with new font scale
+            self.ui.update_font_scale(new_scale)
+            self.update_status(f"字體大小已調整為 {int(new_scale * 100)}%")
+            
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("錯誤", f"套用字體大小時發生錯誤: {str(e)}")
     
     def clear_history(self) -> None:
         """Clear playback history."""

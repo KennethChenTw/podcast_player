@@ -7,21 +7,24 @@ Contains the main UI components and widget creation logic.
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Callable, Optional, Dict, Any
+from ..managers.font_manager import FontManager
 
 
 class PodcastPlayerUI:
     """Main UI components for the podcast player."""
     
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, font_manager: Optional[FontManager] = None):
         """
         Initialize UI components.
         
         Args:
             root: Tkinter root window
+            font_manager: FontManager instance for font scaling
         """
         self.root = root
         self.widgets = {}
         self.callbacks = {}
+        self.font_manager = font_manager or FontManager()
         
         # Style configuration  
         self.setup_styles()
@@ -30,16 +33,11 @@ class PodcastPlayerUI:
         self.create_main_layout()
     
     def setup_styles(self) -> None:
-        """Configure UI styles."""
+        """Configure UI styles with font scaling support."""
         style = ttk.Style()
         
-        # Configure button styles
-        style.configure("Play.TButton", font=("Arial", 12, "bold"))
-        style.configure("Control.TButton", font=("Arial", 10))
-        
-        # Configure label styles
-        style.configure("Title.TLabel", font=("Arial", 14, "bold"))
-        style.configure("Info.TLabel", font=("Arial", 10))
+        # Apply font scaling to styles
+        self.font_manager.apply_to_style(style)
     
     def create_main_layout(self) -> None:
         """Create the main UI layout."""
@@ -148,7 +146,9 @@ class PodcastPlayerUI:
         volume_frame = tk.Frame(controls_frame, bg='#f0f0f0')
         volume_frame.pack(side=tk.RIGHT, padx=10)
         
-        tk.Label(volume_frame, text="音量:", bg='#f0f0f0').pack(side=tk.LEFT)
+        volume_label = tk.Label(volume_frame, text="音量:", bg='#f0f0f0')
+        self.font_manager.configure_widget_font(volume_label, 'content')
+        volume_label.pack(side=tk.LEFT)
         
         self.widgets['volume_var'] = tk.DoubleVar(value=0.7)
         self.widgets['volume_scale'] = tk.Scale(
@@ -164,7 +164,9 @@ class PodcastPlayerUI:
         speed_frame = tk.Frame(controls_frame, bg='#f0f0f0')
         speed_frame.pack(side=tk.RIGHT, padx=10)
         
-        tk.Label(speed_frame, text="速度:", bg='#f0f0f0', font=("Arial", 9)).pack(side=tk.LEFT)
+        speed_label = tk.Label(speed_frame, text="速度:", bg='#f0f0f0')
+        self.font_manager.configure_widget_font(speed_label, 'small')
+        speed_label.pack(side=tk.LEFT)
         
         self.widgets['speed_var'] = tk.StringVar(value="1.0x")
         self.widgets['speed_button'] = ttk.Button(
@@ -197,9 +199,9 @@ class PodcastPlayerUI:
         self.widgets['time_label'] = tk.Label(
             time_frame, 
             text="00:00 / 00:00", 
-            bg='#f0f0f0',
-            font=("Arial", 9, "bold")
+            bg='#f0f0f0'
         )
+        self.font_manager.configure_widget_font(self.widgets['time_label'], 'small', 'bold')
         self.widgets['time_label'].pack(side=tk.LEFT)
         
         # Remaining time
@@ -207,9 +209,9 @@ class PodcastPlayerUI:
             time_frame, 
             text="", 
             bg='#f0f0f0',
-            font=("Arial", 8),
             fg='#666666'
         )
+        self.font_manager.configure_widget_font(self.widgets['remaining_time_label'], 'small')
         self.widgets['remaining_time_label'].pack(side=tk.LEFT, padx=(10, 0))
         
         # Progress percentage
@@ -217,9 +219,9 @@ class PodcastPlayerUI:
             time_frame, 
             text="0%", 
             bg='#f0f0f0',
-            font=("Arial", 8),
             fg='#666666'
         )
+        self.font_manager.configure_widget_font(self.widgets['progress_percent_label'], 'small')
         self.widgets['progress_percent_label'].pack(side=tk.RIGHT)
         
         # Playback rate indicator
@@ -227,9 +229,9 @@ class PodcastPlayerUI:
             time_frame, 
             text="1.0x", 
             bg='#f0f0f0',
-            font=("Arial", 8),
             fg='#333333'
         )
+        self.font_manager.configure_widget_font(self.widgets['rate_indicator_label'], 'small')
         self.widgets['rate_indicator_label'].pack(side=tk.RIGHT, padx=(0, 10))
     
     def create_rss_section(self) -> None:
@@ -241,7 +243,9 @@ class PodcastPlayerUI:
         input_frame = tk.Frame(rss_frame, bg='#f0f0f0')
         input_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        tk.Label(input_frame, text="RSS URL:", bg='#f0f0f0').pack(side=tk.LEFT)
+        rss_label = tk.Label(input_frame, text="RSS URL:", bg='#f0f0f0')
+        self.font_manager.configure_widget_font(rss_label, 'content')
+        rss_label.pack(side=tk.LEFT)
         
         self.widgets['rss_entry'] = tk.Entry(input_frame, width=50, state='normal')
         self.widgets['rss_entry'].pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
@@ -712,6 +716,36 @@ class PodcastPlayerUI:
             return 'break'  # Prevent further event propagation
         except Exception as e:
             print(f"Error selecting all in search: {e}")
+    
+    def update_font_scale(self, new_scale: float) -> None:
+        """
+        Update font scaling for all UI components.
+        
+        Args:
+            new_scale: New font scale factor (0.8 to 1.2)
+        """
+        # Update font manager scale
+        self.font_manager.set_scale(new_scale)
+        
+        # Re-apply styles
+        self.setup_styles()
+        
+        # Update specific widgets that use manual font configuration
+        widgets_to_update = [
+            ('time_label', 'small', 'bold'),
+            ('remaining_time_label', 'small', 'normal'),
+            ('progress_percent_label', 'small', 'normal'),
+            ('rate_indicator_label', 'small', 'normal')
+        ]
+        
+        for widget_name, font_type, weight in widgets_to_update:
+            if widget_name in self.widgets:
+                self.font_manager.configure_widget_font(
+                    self.widgets[widget_name], font_type, weight
+                )
+        
+        # Force UI refresh
+        self.root.update_idletasks()
     
     def _show_about(self) -> None:
         """Show about dialog."""

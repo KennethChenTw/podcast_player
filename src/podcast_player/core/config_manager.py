@@ -40,7 +40,8 @@ class ConfigManager:
             'last_playlist_index': 0,
             'theme': 'light',
             'episode_load_mode': 'all',  # 'all' or 'latest'
-            'latest_episode_count': 10
+            'latest_episode_count': 10,
+            'font_scale': 1.0  # Font scaling factor (0.8 to 1.2)
         }
         
         # Current settings in memory
@@ -329,4 +330,67 @@ class ConfigManager:
             return False
         except OSError as e:
             print(f"Error deleting settings file: {e}")
+            return False
+    
+    def get_font_scale(self) -> float:
+        """
+        Get font scale setting.
+        
+        Returns:
+            Font scale factor (0.8 to 1.2)
+        """
+        scale = self.get_setting('font_scale', self.defaults['font_scale'])
+        return max(0.8, min(1.2, scale))  # 確保在有效範圍內
+    
+    def set_font_scale(self, scale: float) -> None:
+        """
+        Set font scale setting.
+        
+        Args:
+            scale: Font scale factor (0.8 to 1.2)
+        """
+        # 確保縮放值在有效範圍內
+        validated_scale = max(0.8, min(1.2, scale))
+        self.set_setting('font_scale', validated_scale)
+    
+    def get_font_scale_percentage(self) -> int:
+        """
+        Get font scale as percentage.
+        
+        Returns:
+            Scale percentage (80-120)
+        """
+        return int(self.get_font_scale() * 100)
+    
+    def save_basic_settings(self) -> bool:
+        """
+        Save basic settings without requiring window state parameters.
+        
+        Returns:
+            bool: True if saved successfully, False otherwise
+        """
+        try:
+            # Load existing settings
+            settings = {}
+            if os.path.exists(self.settings_file):
+                try:
+                    with open(self.settings_file, 'r', encoding='utf-8') as f:
+                        settings = json.load(f)
+                except:
+                    pass
+            
+            # Update with current in-memory settings
+            settings.update(self.settings)
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
+            
+            # Save to file
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, indent=2, ensure_ascii=False)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving basic settings: {e}")
             return False
