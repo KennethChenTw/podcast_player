@@ -52,8 +52,18 @@ class PreferencesDialog:
         """Create the dialog window and widgets."""
         self.dialog = tk.Toplevel(self.parent)
         self.dialog.title("偏好設定")
-        self.dialog.geometry("400x300")
-        self.dialog.resizable(False, False)
+        
+        # Calculate responsive dialog size
+        base_width, base_height = 400, 300
+        current_scale = self.font_manager.scale
+        
+        # Dialog size scales more conservatively than font
+        size_scale = 1.0 + (current_scale - 1.0) * 0.4
+        dialog_width = int(base_width * size_scale)
+        dialog_height = int(base_height * size_scale)
+        
+        self.dialog.geometry(f"{dialog_width}x{dialog_height}")
+        self.dialog.resizable(True, True)  # Allow resizing for large fonts
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
         
@@ -74,14 +84,21 @@ class PreferencesDialog:
         
         self._create_appearance_tab(appearance_frame)
         
-        # Button frame
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X)
+        # Button frame with responsive padding
+        current_scale = self.font_manager.scale
+        base_pady = 10
+        responsive_pady = self.font_manager.get_responsive_padding(base_pady)
         
-        # Buttons
-        ttk.Button(button_frame, text="確定", command=self._on_ok).pack(side=tk.RIGHT, padx=(5, 0))
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(responsive_pady, 0))
+        
+        # Buttons with responsive spacing
+        base_padx = 5
+        responsive_padx = self.font_manager.get_responsive_padding(base_padx)
+        
+        ttk.Button(button_frame, text="確定", command=self._on_ok).pack(side=tk.RIGHT, padx=(responsive_padx, 0))
         ttk.Button(button_frame, text="取消", command=self._on_cancel).pack(side=tk.RIGHT)
-        ttk.Button(button_frame, text="套用", command=self._on_apply).pack(side=tk.RIGHT, padx=(0, 5))
+        ttk.Button(button_frame, text="套用", command=self._on_apply).pack(side=tk.RIGHT, padx=(0, responsive_padx))
         ttk.Button(button_frame, text="重設", command=self._on_reset).pack(side=tk.LEFT)
         
     def _create_appearance_tab(self, parent: ttk.Frame) -> None:
@@ -104,19 +121,19 @@ class PreferencesDialog:
         scale_frame = ttk.Frame(font_frame)
         scale_frame.pack(fill=tk.X, pady=(0, 5))
         
-        ttk.Label(scale_frame, text="80%").pack(side=tk.LEFT)
+        ttk.Label(scale_frame, text="60%").pack(side=tk.LEFT)
         
         self.font_scale_slider = ttk.Scale(
             scale_frame,
-            from_=0.8,
-            to=1.2,
+            from_=0.6,
+            to=2.0,
             orient=tk.HORIZONTAL,
             variable=self.font_scale_var,
             command=self._on_font_scale_change
         )
         self.font_scale_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
         
-        ttk.Label(scale_frame, text="120%").pack(side=tk.RIGHT)
+        ttk.Label(scale_frame, text="200%").pack(side=tk.RIGHT)
         
         # Preview section
         preview_frame = ttk.LabelFrame(font_frame, text="預覽", padding="10")
@@ -127,6 +144,9 @@ class PreferencesDialog:
             text="這是字體大小的預覽文字\\nFont size preview text",
             justify=tk.CENTER
         )
+        # Apply current font scale to preview
+        current_scale = self.font_manager.scale
+        self.font_manager.configure_widget_font(self.preview_label, 'content')
         self.preview_label.pack()
         
     def _load_current_settings(self) -> None:
@@ -170,12 +190,15 @@ class PreferencesDialog:
     def _update_preview(self, scale: float) -> None:
         """Update preview label with new font scale."""
         if self.preview_label:
-            # Calculate preview font size
-            base_size = 10
-            preview_size = int(base_size * scale)
+            # Temporarily update font manager scale for preview
+            original_scale = self.font_manager.scale
+            self.font_manager.set_scale(scale)
             
-            # Update preview font
-            self.preview_label.configure(font=("Arial", preview_size))
+            # Apply the scaled font to preview
+            self.font_manager.configure_widget_font(self.preview_label, 'content')
+            
+            # Restore original scale
+            self.font_manager.set_scale(original_scale)
             
     def _on_ok(self) -> None:
         """Handle OK button click."""

@@ -248,6 +248,8 @@ class PodcastPlayerUI:
         rss_label.pack(side=tk.LEFT)
         
         self.widgets['rss_entry'] = tk.Entry(input_frame, width=50, state='normal')
+        # Configure RSS entry font
+        self.font_manager.configure_widget_font(self.widgets['rss_entry'], 'content')
         self.widgets['rss_entry'].pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         
@@ -351,9 +353,10 @@ class PodcastPlayerUI:
         self.widgets['search_status_label'] = tk.Label(
             search_frame,
             text="",
-            font=("Arial", 8),
             fg="gray"
         )
+        # Configure search status font
+        self.font_manager.configure_widget_font(self.widgets['search_status_label'], 'small')
         self.widgets['search_status_label'].pack(side=tk.RIGHT, padx=(5, 0))
         
         # Episode tree view
@@ -363,14 +366,20 @@ class PodcastPlayerUI:
         columns = ('title', 'published', 'duration')
         self.widgets['episode_tree'] = ttk.Treeview(tree_frame, columns=columns, show='headings')
         
-        # Configure columns
+        # Configure columns with responsive widths
         self.widgets['episode_tree'].heading('title', text='標題')
         self.widgets['episode_tree'].heading('published', text='發布日期')
         self.widgets['episode_tree'].heading('duration', text='時長')
         
-        self.widgets['episode_tree'].column('title', width=300)
-        self.widgets['episode_tree'].column('published', width=150)
-        self.widgets['episode_tree'].column('duration', width=80)
+        # Base column widths
+        self.base_column_widths = {
+            'title': 300,
+            'published': 150,
+            'duration': 80
+        }
+        
+        # Apply responsive column widths
+        self._update_treeview_columns()
         
         # Scrollbars
         v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.widgets['episode_tree'].yview)
@@ -392,13 +401,20 @@ class PodcastPlayerUI:
         right_panel = tk.Frame(self.widgets['middle_frame'])
         right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
         
-        tk.Label(right_panel, text="播放清單", font=("Arial", 12, "bold")).pack(anchor=tk.W)
+        playlist_title_label = tk.Label(right_panel, text="播放清單")
+        self.font_manager.configure_widget_font(playlist_title_label, 'title', 'bold')
+        playlist_title_label.pack(anchor=tk.W)
+        
+        # Store reference for font updates
+        self.widgets['playlist_title_label'] = playlist_title_label
         
         # Playlist listbox
         playlist_frame = tk.Frame(right_panel)
         playlist_frame.pack(fill=tk.BOTH, expand=True)
         
         self.widgets['playlist_listbox'] = tk.Listbox(playlist_frame)
+        # Configure playlist listbox font
+        self.font_manager.configure_widget_font(self.widgets['playlist_listbox'], 'content')
         
         # Scrollbar for playlist
         playlist_scrollbar = ttk.Scrollbar(playlist_frame, orient=tk.VERTICAL, command=self.widgets['playlist_listbox'].yview)
@@ -418,6 +434,8 @@ class PodcastPlayerUI:
             anchor=tk.W,
             bg='#e0e0e0'
         )
+        # Configure status bar font
+        self.font_manager.configure_widget_font(self.widgets['status_label'], 'content')
         self.widgets['status_label'].pack(fill=tk.X, padx=5, pady=2)
     
     def set_callback(self, event_name: str, callback: Callable) -> None:
@@ -588,10 +606,18 @@ class PodcastPlayerUI:
         for item in self.widgets['episode_tree'].get_children():
             self.widgets['episode_tree'].delete(item)
         
-        # Add episodes
+        # Get responsive text truncation length
+        base_title_length = 50
+        max_title_length = self.font_manager.get_text_truncation_length(base_title_length)
+        
+        # Add episodes with responsive text truncation
         for episode in episodes:
+            title = episode.title
+            if len(title) > max_title_length:
+                title = title[:max_title_length] + "..."
+                
             self.widgets['episode_tree'].insert('', tk.END, values=(
-                episode.title[:50] + "..." if len(episode.title) > 50 else episode.title,
+                title,
                 episode.published,
                 episode.duration or "Unknown"
             ))
@@ -604,9 +630,17 @@ class PodcastPlayerUI:
         # Clear existing items
         self.widgets['playlist_listbox'].delete(0, tk.END)
         
-        # Add tracks
+        # Get responsive text truncation for playlist
+        base_playlist_length = 60  # Longer than episode tree since it's a single column
+        max_title_length = self.font_manager.get_text_truncation_length(base_playlist_length)
+        
+        # Add tracks with responsive text truncation
         for i, track in enumerate(tracks):
-            display_text = f"{i+1:2d}. {track.title}"
+            title = track.title
+            if len(title) > max_title_length:
+                title = title[:max_title_length] + "..."
+                
+            display_text = f"{i+1:2d}. {title}"
             self.widgets['playlist_listbox'].insert(tk.END, display_text)
             
             # Highlight current track
@@ -717,12 +751,72 @@ class PodcastPlayerUI:
         except Exception as e:
             print(f"Error selecting all in search: {e}")
     
+    def _update_treeview_columns(self) -> None:
+        """Update TreeView column widths based on font scale."""
+        if 'episode_tree' not in self.widgets:
+            return
+            
+        # Map column names to types for responsive scaling
+        column_types = {
+            'title': 'title',
+            'published': 'date', 
+            'duration': 'duration'
+        }
+        
+        for column, base_width in self.base_column_widths.items():
+            column_type = column_types.get(column, 'generic')
+            new_width = self.font_manager.get_responsive_column_width(base_width, column_type)
+            self.widgets['episode_tree'].column(column, width=new_width)
+            
+        # Force TreeView to update its display
+        try:
+            # 重新套用樣式以確保標題字體更新
+            self.setup_styles()
+        except Exception as e:
+            print(f"Warning: Could not update TreeView styles: {e}")
+    
+    def _update_responsive_padding(self) -> None:
+        """Update UI padding based on font scale."""
+        # Update main frame padding
+        base_padx, base_pady = 5, 5
+        new_padx = self.font_manager.get_responsive_padding(base_padx)
+        new_pady = self.font_manager.get_responsive_padding(base_pady)
+        
+        # Apply to major containers
+        containers_to_update = ['top_frame', 'middle_frame', 'bottom_frame']
+        for container_name in containers_to_update:
+            if container_name in self.widgets:
+                container = self.widgets[container_name]
+                try:
+                    # Get current pack info and update padding
+                    pack_info = container.pack_info()
+                    if pack_info:
+                        # 保持原有的其他配置，只更新 padding
+                        current_padx = pack_info.get('padx', 0)
+                        current_pady = pack_info.get('pady', 0)
+                        
+                        # 只有當當前 padding 不為 0 時才更新
+                        if current_padx or current_pady:
+                            container.pack_configure(padx=new_padx, pady=new_pady)
+                except tk.TclError:
+                    pass  # Widget might not be packed
+    
+    def _update_minimum_window_size(self) -> None:
+        """Update minimum window size based on font scale."""
+        base_width, base_height = 800, 600
+        min_width, min_height = self.font_manager.get_minimum_window_size(base_width, base_height)
+        
+        try:
+            self.root.minsize(min_width, min_height)
+        except tk.TclError:
+            pass  # Ignore if window is not ready
+    
     def update_font_scale(self, new_scale: float) -> None:
         """
         Update font scaling for all UI components.
         
         Args:
-            new_scale: New font scale factor (0.8 to 1.2)
+            new_scale: New font scale factor (0.6 to 2.0)
         """
         # Update font manager scale
         self.font_manager.set_scale(new_scale)
@@ -735,7 +829,12 @@ class PodcastPlayerUI:
             ('time_label', 'small', 'bold'),
             ('remaining_time_label', 'small', 'normal'),
             ('progress_percent_label', 'small', 'normal'),
-            ('rate_indicator_label', 'small', 'normal')
+            ('rate_indicator_label', 'small', 'normal'),
+            ('playlist_listbox', 'content', 'normal'),
+            ('rss_entry', 'content', 'normal'),
+            ('status_label', 'content', 'normal'),
+            ('search_status_label', 'small', 'normal'),
+            ('playlist_title_label', 'title', 'bold')  # 播放清單標題
         ]
         
         for widget_name, font_type, weight in widgets_to_update:
@@ -743,6 +842,11 @@ class PodcastPlayerUI:
                 self.font_manager.configure_widget_font(
                     self.widgets[widget_name], font_type, weight
                 )
+        
+        # Update responsive layout
+        self._update_treeview_columns()
+        self._update_responsive_padding()
+        self._update_minimum_window_size()
         
         # Force UI refresh
         self.root.update_idletasks()

@@ -41,7 +41,7 @@ class ConfigManager:
             'theme': 'light',
             'episode_load_mode': 'all',  # 'all' or 'latest'
             'latest_episode_count': 10,
-            'font_scale': 1.0  # Font scaling factor (0.8 to 1.2)
+            'font_scale': 1.0  # Font scaling factor (0.6 to 2.0)
         }
         
         # Current settings in memory
@@ -337,20 +337,20 @@ class ConfigManager:
         Get font scale setting.
         
         Returns:
-            Font scale factor (0.8 to 1.2)
+            Font scale factor (0.6 to 2.0)
         """
         scale = self.get_setting('font_scale', self.defaults['font_scale'])
-        return max(0.8, min(1.2, scale))  # 確保在有效範圍內
+        return max(0.6, min(2.0, scale))  # 確保在有效範圍內
     
     def set_font_scale(self, scale: float) -> None:
         """
         Set font scale setting.
         
         Args:
-            scale: Font scale factor (0.8 to 1.2)
+            scale: Font scale factor (0.6 to 2.0)
         """
         # 確保縮放值在有效範圍內
-        validated_scale = max(0.8, min(1.2, scale))
+        validated_scale = max(0.6, min(2.0, scale))
         self.set_setting('font_scale', validated_scale)
     
     def get_font_scale_percentage(self) -> int:
@@ -358,7 +358,7 @@ class ConfigManager:
         Get font scale as percentage.
         
         Returns:
-            Scale percentage (80-120)
+            Scale percentage (60-200)
         """
         return int(self.get_font_scale() * 100)
     

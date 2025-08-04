@@ -164,6 +164,14 @@ class MainWindow:
         self.menubar.add_cascade(label="說明", menu=help_menu)
         help_menu.add_command(label="快捷鍵", command=self.show_shortcuts)
         help_menu.add_command(label="關於", command=self.show_about)
+        
+        # Apply font scaling to all menus
+        self.font_manager.configure_menu_font(self.menubar)
+        self.font_manager.configure_menu_font(file_menu)
+        self.font_manager.configure_menu_font(edit_menu)
+        self.font_manager.configure_menu_font(view_menu)
+        self.font_manager.configure_menu_font(theme_menu)
+        self.font_manager.configure_menu_font(help_menu)
     
     def setup_status_bar(self) -> None:
         """Create and configure the status bar."""
@@ -312,11 +320,42 @@ class MainWindow:
         try:
             # Update UI with new font scale
             self.ui.update_font_scale(new_scale)
+            
+            # Update menu fonts
+            self._update_menu_fonts()
+            
             self.update_status(f"字體大小已調整為 {int(new_scale * 100)}%")
             
         except Exception as e:
             from tkinter import messagebox
             messagebox.showerror("錯誤", f"套用字體大小時發生錯誤: {str(e)}")
+    
+    def _update_menu_fonts(self) -> None:
+        """Update all menu fonts."""
+        try:
+            # Get all menus from the menu bar
+            if hasattr(self, 'menubar'):
+                self.font_manager.configure_menu_font(self.menubar)
+                
+                # Update all submenus
+                for i in range(self.menubar.index('end') + 1):
+                    try:
+                        submenu = self.menubar.nametowidget(self.menubar.entryconfig(i, 'menu')[4][1])
+                        if isinstance(submenu, tk.Menu):
+                            self.font_manager.configure_menu_font(submenu)
+                            
+                            # Update sub-submenus (like theme menu)
+                            for j in range(submenu.index('end') + 1):
+                                try:
+                                    subsubmenu = submenu.nametowidget(submenu.entryconfig(j, 'menu')[4][1])
+                                    if isinstance(subsubmenu, tk.Menu):
+                                        self.font_manager.configure_menu_font(subsubmenu)
+                                except (tk.TclError, KeyError):
+                                    pass  # Not a submenu entry
+                    except (tk.TclError, KeyError):
+                        pass  # Not a menu entry
+        except Exception as e:
+            print(f"Warning: Could not update menu fonts: {e}")
     
     def clear_history(self) -> None:
         """Clear playback history."""
